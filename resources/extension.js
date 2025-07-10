@@ -83,7 +83,7 @@
 
     const handleSend = () => {
       if (!input.trim()) return;
-      setMessages([...messages, { user: "You", text: input }]);
+      setMessages(prev => [...prev, { user: "You", text: input }]);
       setInput("");
 
       if (!isValidUrl(backendUrl)) {
@@ -150,8 +150,10 @@
           overflowY: "auto"
         }
       },
+      React.createElement("div", { style: { textAlign: "right" } },
+        React.createElement("button", { onClick: close }, "×")
+      ),
       React.createElement("h2", null, "Argo CD Chat Assistant"),
-      React.createElement("button", { onClick: close, style: { float: "right" } }, "×"),
       React.createElement("div", { style: { marginBottom: "10px" } },
         React.createElement("label", { htmlFor: "backendUrl", style: { marginRight: "10px" } }, "Backend URL:"),
         React.createElement("input", {
@@ -159,7 +161,7 @@
           id: "backendUrl",
           value: backendUrl,
           onChange: e => setBackendUrl(e.target.value),
-          placeholder: "https://backend/api/analyze",
+          placeholder: "https://your-backend/api/analyze",
           style: { width: "60%" }
         })
       ),
@@ -175,12 +177,12 @@
           apps.map(app => React.createElement("option", { key: app, value: app }, app))
         )
       ),
-      loading && React.createElement("p", { style: { color: "orange" } }, "Analyzing app status... Please wait..."),
+      loading && React.createElement("p", { style: { color: "orange" } }, "Analyzing app status..."),
       selectedApp && React.createElement("div", null,
         React.createElement("div", {
           style: {
             border: "1px solid #ccc",
-            height: "300px",
+            height: "250px",
             overflowY: "auto",
             padding: "10px",
             marginBottom: "10px",
@@ -210,25 +212,29 @@
     );
   };
 
-  window.extensionsAPI.registerTopBarMenuAction(() => {
-    const modalRoot = document.createElement("div");
-    modalRoot.style.position = "fixed";
-    modalRoot.style.top = "0";
-    modalRoot.style.left = "0";
-    modalRoot.style.width = "100%";
-    modalRoot.style.height = "100%";
-    modalRoot.style.backgroundColor = "rgba(0,0,0,0.3)";
-    modalRoot.style.zIndex = "10000";
-    modalRoot.style.display = "flex";
-    modalRoot.style.justifyContent = "center";
-    modalRoot.style.alignItems = "center";
+  window.extensionsAPI.registerTopBarMenuAction(
+    () => {
+      const modalRoot = document.createElement("div");
+      modalRoot.style.position = "fixed";
+      modalRoot.style.top = "0";
+      modalRoot.style.left = "0";
+      modalRoot.style.width = "100%";
+      modalRoot.style.height = "100%";
+      modalRoot.style.backgroundColor = "rgba(0,0,0,0.3)";
+      modalRoot.style.zIndex = "10000";
+      modalRoot.style.display = "flex";
+      modalRoot.style.justifyContent = "center";
+      modalRoot.style.alignItems = "center";
 
-    const closeModal = () => {
-      ReactDOM.unmountComponentAtNode(modalRoot);
-      document.body.removeChild(modalRoot);
-    };
+      const closeModal = () => {
+        ReactDOM.unmountComponentAtNode(modalRoot);
+        document.body.removeChild(modalRoot);
+      };
 
-    document.body.appendChild(modalRoot);
-    ReactDOM.render(React.createElement(ChatDialog, { close: closeModal }), modalRoot);
-  }, "Open Chat Assistant", "fa-comments");
+      document.body.appendChild(modalRoot);
+      ReactDOM.render(React.createElement(ChatDialog, { close: closeModal }), modalRoot);
+    },
+    "Chat Assistant",
+    "fa-comments"
+  );
 })(window);
