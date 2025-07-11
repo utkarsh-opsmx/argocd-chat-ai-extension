@@ -52,19 +52,19 @@
       fetch(`${window.location.origin}/api/v1/applications/${appName}`)
         .then(res => res.json())
         .then(appData => {
-          const degradedResources = filterRelevantResources(appData.status);
-          const payload = {
-            application: appName,
-            status: {
-              resources: degradedResources,
-              sync: appData.status.sync,
-              health: appData.status.health
-            }
-          };
+          // const degradedResources = filterRelevantResources(appData.status);
+          // const payload = {
+          //   application: appName,
+          //   status: {
+          //     resources: degradedResources,
+          //     sync: appData.status.sync,
+          //     health: appData.status.health
+          //   }
+          // };
           return fetch(backendUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(appData)
           });
         })
         .then(res => res.json())
