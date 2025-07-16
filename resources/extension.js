@@ -8,7 +8,7 @@
     const [backendUrl, setBackendUrl] = React.useState("");
     const [apiRequest, setApiRequest] = React.useState(null);
     const [appJson, setAppJson] = React.useState(null);
-    const [counter, counterAppJson] = React.useState(new Map(["test", 0]));
+    const [counter, setCounterAppJson] = React.useState(new Map(["test", 0]));
 
     React.useEffect(() => {
       fetch(`${window.location.origin}/api/v1/applications`)
@@ -92,7 +92,7 @@
         return;
       }
 
-      if(counter.get(appName) == 0) {
+      if(counter.get(selectedApp) == 0) {
         fetch(backendUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,8 +104,9 @@
           if (data.request) {
             setApiRequest(data.request);
           }
-        }).then(x => {
-          counter.set(appName, 1);
+          const newCounter = new Map(counter);
+          newCounter.set(selectedApp, 1);
+          setCounterAppJson(newCounter);
         })
         .catch(err => {
           console.error("Chat backend error:", err);
@@ -115,7 +116,7 @@
         fetch(backendUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp, status: appData.status, spec: appData.spec  })
+        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp, status: appJson.status, spec: appJson.spec  })
       })
         .then(res => res.json())
         .then(data => {
