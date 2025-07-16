@@ -92,11 +92,11 @@
         return;
       }
 
-      if(counter.get(selectedApp) == 0) {
+      if(counter.get(selectedApp) == undefined) {
         fetch(backendUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp })
+        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp, status: appJson.status, spec: appJson.spec})
       })
         .then(res => res.json())
         .then(data => {
@@ -116,7 +116,7 @@
         fetch(backendUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp, status: appJson.status, spec: appJson.spec  })
+        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp  })
       })
         .then(res => res.json())
         .then(data => {
