@@ -8,7 +8,7 @@
     const [backendUrl, setBackendUrl] = React.useState("");
     const [apiRequest, setApiRequest] = React.useState(null);
     const [appJson, setAppJson] = React.useState(null);
-    const [counter, setCounterAppJson] = React.useState(new Map(["test", 0]));
+    const [counter, setCounterAppJson] = React.useState(new Map([["test", 0]]));
 
     React.useEffect(() => {
       fetch(`${window.location.origin}/api/v1/applications`)
