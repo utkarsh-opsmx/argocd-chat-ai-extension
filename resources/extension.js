@@ -1,3 +1,4 @@
+
 ((window) => {
   const ChatExtension = () => {
     const [apps, setApps] = React.useState([]);
@@ -31,15 +32,6 @@
       }
     };
 
-    const filterRelevantResources = (status) => {
-      if (!status || !Array.isArray(status.resources)) return [];
-      return status.resources.filter(res => {
-        const isSynced = res.status === "Synced";
-        const isHealthy = res.health && res.health.status === "Healthy";
-        return !(isSynced && isHealthy);
-      });
-    };
-
     const handleAppChange = (e) => {
       const appName = e.target.value;
       setSelectedApp(appName);
@@ -47,7 +39,7 @@
       setInput("");
       setApiRequest(null);
       if (!isValidUrl(backendUrl)) {
-        alert("Please enter a valid backend URL (must start with http:// or https://)");
+        alert("Please enter a valid backend URL");
         return;
       }
 
@@ -56,25 +48,7 @@
         .then(res => res.json())
         .then(appData => {
           setAppJson(appData);
-          // const degradedResources = filterRelevantResources(appData.status);
-          // const payload = {
-          //   application: appName,
-          //   status: appData.status,
-          //   spec: appData.spec
-          // };
-          // return fetch(backendUrl, {
-          //   method: "POST",
-          //   headers: { "Content-Type": "application/json" },
-          //   body: JSON.stringify(payload)
-          // });
         })
-        // .then(res => res.json())
-        // .then(data => {
-        //   setMessages(prev => [...prev, { user: "Agent", text: data.reply || JSON.stringify(data) }]);
-        //   if (data.request) {
-        //     setApiRequest(data.request);
-        //   }
-        // })
         .catch(err => {
           console.error("Backend error:", err);
           setMessages(prev => [...prev, { user: "Agent", text: "Error getting analysis from backend." }]);
@@ -92,49 +66,43 @@
         return;
       }
 
-      if(counter.get(selectedApp) == undefined) {
-        fetch(backendUrl, {
+      const payload = {
+        message: input,
+        sessionId: selectedApp,
+        application: selectedApp,
+        ...(counter.get(selectedApp) === undefined ? {
+          status: appJson?.status,
+          spec: appJson?.spec
+        } : {})
+      };
+
+      fetch(backendUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp, status: appJson.status, spec: appJson.spec})
+        body: JSON.stringify(payload)
       })
         .then(res => res.json())
         .then(data => {
           setMessages(prev => [...prev, { user: "Agent", text: data.reply || JSON.stringify(data) }]);
-          if (data.request) {
+          if (data.request && data.request.method !== "None" && data.request.url !== "None") {
             setApiRequest(data.request);
+          } else {
+            setApiRequest(null);
           }
-          const newCounter = new Map(counter);
-          newCounter.set(selectedApp, 1);
-          setCounterAppJson(newCounter);
-        })
-        .catch(err => {
-          console.error("Chat backend error:", err);
-          setMessages(prev => [...prev, { user: "Agent", text: "Error getting chat response." }]);
-        });
-      } else {
-        fetch(backendUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, sessionId: selectedApp, application: selectedApp  })
-      })
-        .then(res => res.json())
-        .then(data => {
-          setMessages(prev => [...prev, { user: "Agent", text: data.reply || JSON.stringify(data) }]);
-          if (data.request) {
-            setApiRequest(data.request);
+          if (counter.get(selectedApp) === undefined) {
+            const newCounter = new Map(counter);
+            newCounter.set(selectedApp, 1);
+            setCounterAppJson(newCounter);
           }
         })
         .catch(err => {
           console.error("Chat backend error:", err);
           setMessages(prev => [...prev, { user: "Agent", text: "Error getting chat response." }]);
         });
-      }
-      
     };
 
     const runSuggestedRequest = () => {
-      if (!apiRequest || !apiRequest.url || !apiRequest.method) {
+      if (!apiRequest || !apiRequest.url || !apiRequest.method || apiRequest.method === "None" || apiRequest.url === "None") {
         alert("No valid request to run.");
         return;
       }
