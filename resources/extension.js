@@ -7,6 +7,7 @@ const [input, setInput] = React.useState("");
 const [loading, setLoading] = React.useState(false);
 const [backendUrl, setBackendUrl] = React.useState("");
 const [apiRequest, setApiRequest] = React.useState(null);
+const [apiResponse, setApiResponse] = React.useState(null);
 const [appJson, setAppJson] = React.useState(null);
 const [counter, setCounterAppJson] = React.useState(new Map());
 
@@ -37,6 +38,7 @@ const handleAppChange = (e) => {
   setMessages([]);
   setInput("");
   setApiRequest(null);
+  setApiResponse(null);
 
   if (!isValidUrl(backendUrl)) {
     alert("Please enter a valid backend URL.");
@@ -120,18 +122,11 @@ const runSuggestedRequest = () => {
   })
     .then(res => res.json())
     .then(data => {
-      setMessages(prev => [
-        ...prev,
-        { user: "Agent", text: `✅ Executed ${apiRequest.method} ${apiRequest.url}` },
-        { user: "Agent", text: JSON.stringify(data, null, 2) }
-      ]);
+      setApiResponse(data);
     })
     .catch(err => {
       console.error("API request failed:", err);
-      setMessages(prev => [
-        ...prev,
-        { user: "Agent", text: `❌ Failed to execute ${apiRequest.method} ${apiRequest.url}` }
-      ]);
+      setApiResponse({ error: "Request failed: " + err.message });
     });
 };
 
@@ -194,6 +189,24 @@ return React.createElement("div", { style: { padding: "20px", fontFamily: "sans-
         React.createElement("div", { style: { marginTop: "10px" } },
           React.createElement("p", null, `Suggested: ${apiRequest.method} ${apiRequest.url}`),
           React.createElement("button", { onClick: runSuggestedRequest }, "Send Request")
+        ),
+      apiResponse &&
+        React.createElement("div", {
+          style: {
+            marginTop: "15px",
+            padding: "10px",
+            border: "1px solid #ccc",
+            backgroundColor: "#eef5ff",
+            maxHeight: "200px",
+            overflowY: "auto",
+            whiteSpace: "pre-wrap",
+            fontFamily: "monospace"
+          }
+        },
+          React.createElement("strong", null, "API Response:\n"),
+          typeof apiResponse === "string"
+            ? apiResponse
+            : JSON.stringify(apiResponse, null, 2)
         )
     ),
   !selectedApp &&
