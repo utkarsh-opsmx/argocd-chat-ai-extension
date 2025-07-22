@@ -58,10 +58,12 @@ const handleAppChange = (e) => {
     .finally(() => setLoading(false));
 };
 
-const handleSend = () => {
-  if (!input.trim()) return;
-  setMessages(prev => [...prev, { user: "You", text: input }]);
-  setInput("");
+const handleSend = (msg = null) => {
+  const userInput = msg || input.trim();
+  if (!userInput) return;
+
+  setMessages(prev => [...prev, { user: "You", text: userInput }]);
+  if (!msg) setInput("");
 
   if (!isValidUrl(backendUrl)) {
     alert("Please enter a valid backend URL.");
@@ -74,7 +76,7 @@ const handleSend = () => {
   setCounterAppJson(newCounter);
 
   const payload = {
-    message: input,
+    message: userInput,
     sessionId: selectedApp,
     application: selectedApp,
     ...(firstTime && appJson ? { status: appJson.status, spec: appJson.spec } : {})
@@ -128,6 +130,14 @@ const runSuggestedRequest = () => {
       console.error("API request failed:", err);
       setApiResponse({ error: "Request failed: " + err.message });
     });
+};
+
+const sendApiResponseToAgent = () => {
+  if (!apiResponse) return;
+  const responseString = typeof apiResponse === "string"
+    ? apiResponse
+    : JSON.stringify(apiResponse, null, 2);
+  handleSend(responseString);
 };
 
 return React.createElement("div", { style: { padding: "20px", fontFamily: "sans-serif" } },
@@ -184,7 +194,7 @@ return React.createElement("div", { style: { padding: "20px", fontFamily: "sans-
         placeholder: "Type your message...",
         style: { width: "80%", marginRight: "5px" }
       }),
-      React.createElement("button", { onClick: handleSend }, "Send"),
+      React.createElement("button", { onClick: () => handleSend() }, "Send"),
       apiRequest &&
         React.createElement("div", { style: { marginTop: "10px" } },
           React.createElement("p", null, `Suggested: ${apiRequest.method} ${apiRequest.url}`),
@@ -207,6 +217,10 @@ return React.createElement("div", { style: { padding: "20px", fontFamily: "sans-
           typeof apiResponse === "string"
             ? apiResponse
             : JSON.stringify(apiResponse, null, 2)
+        ),
+      apiResponse &&
+        React.createElement("div", { style: { marginTop: "10px" } },
+          React.createElement("button", { onClick: sendApiResponseToAgent }, "Send to AI")
         )
     ),
   !selectedApp &&
