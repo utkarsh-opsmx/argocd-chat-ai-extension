@@ -1,198 +1,210 @@
-((window) => {
-  const { React, axios } = window;
+(() => {
+const ChatExtension = () => {
+const [apps, setApps] = React.useState([]);
+const [selectedApp, setSelectedApp] = React.useState("");
+const [messages, setMessages] = React.useState([]);
+const [input, setInput] = React.useState("");
+const [loading, setLoading] = React.useState(false);
+const [backendUrl, setBackendUrl] = React.useState("");
+const [apiRequest, setApiRequest] = React.useState(null);
+const [appJson, setAppJson] = React.useState(null);
+const [counter, setCounterAppJson] = React.useState(new Map());
 
-  const ArgoCDAIExtension = () => {
-    const { api } = React.useContext(window.ArgoUI.Context);
-    const [backendUrl, setBackendUrl] = React.useState('');
-    const [applications, setApplications] = React.useState([]);
-    const [selectedApp, setSelectedApp] = React.useState('');
-    const [appManifest, setAppManifest] = React.useState(null);
-    const [chatInput, setChatInput] = React.useState('');
-    const [chatHistory, setChatHistory] = React.useState([]);
-    const [apiResponse, setApiResponse] = React.useState(null);
-    const [agentReply, setAgentReply] = React.useState(null);
-    const [error, setError] = React.useState('');
+React.useEffect(() => {
+  fetch(`${window.location.origin}/api/v1/applications`)
+    .then(res => res.json())
+    .then(data => {
+      const names = data.items.map(item => item.metadata.name);
+      setApps(names);
+    })
+    .catch(err => {
+      console.error("Failed to fetch applications:", err);
+    });
+}, []);
 
-    React.useEffect(() => {
-      const fetchApplications = async () => {
-        try {
-          const response = await api.get('/api/v1/applications');
-          setApplications(response.data.items || []);
-        } catch (err) {
-          setError('Failed to fetch applications');
-        }
-      };
-      fetchApplications();
-    }, []);
+const isValidUrl = (url) => {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+};
 
-    React.useEffect(() => {
-      if (selectedApp) {
-        const fetchManifest = async () => {
-          try {
-            const response = await api.get(`/api/v1/applications/${selectedApp}`);
-            setAppManifest(response.data);
-          } catch (err) {
-            setError('Failed to fetch application manifest');
-          }
-        };
-        fetchManifest();
-      }
-    }, [selectedApp]);
+const handleAppChange = (e) => {
+  const appName = e.target.value;
+  setSelectedApp(appName);
+  setMessages([]);
+  setInput("");
+  setApiRequest(null);
 
-    const sendMessage = async () => {
-      if (!backendUrl || !chatInput || !selectedApp || !appManifest) {
-        setError('Please provide backend URL, select an application, and enter a message');
-        return;
-      }
+  if (!isValidUrl(backendUrl)) {
+    alert("Please enter a valid backend URL.");
+    return;
+  }
 
-      const message = {
-        userInput: chatInput,
-        appName: selectedApp,
-        appStatus: appManifest.status,
-        appSpec: appManifest.spec,
-      };
+  setLoading(true);
+  fetch(`${window.location.origin}/api/v1/applications/${appName}`)
+    .then(res => res.json())
+    .then(appData => {
+      setAppJson(appData);
+    })
+    .catch(err => {
+      console.error("Failed to fetch app details:", err);
+      setMessages(prev => [...prev, { user: "Agent", text: "Error getting app data." }]);
+    })
+    .finally(() => setLoading(false));
+};
 
-      try {
-        const response = await axios.post(backendUrl, message);
-        setAgentReply(response.data);
-        setChatHistory([...chatHistory, `User: ${chatInput}`, `AI: ${response.data.comment}`]);
-        setChatInput('');
-        setError('');
-      } catch (err) {
-        setError('Failed to send message to backend');
-      }
-    };
+const handleSend = () => {
+  if (!input.trim()) return;
+  setMessages(prev => [...prev, { user: "You", text: input }]);
+  setInput("");
 
-    const runApi = async () => {
-      if (!agentReply || !agentReply.shouldRun || !agentReply.method || !agentReply.url) {
-        setError('Invalid API configuration in agent reply');
-        return;
-      }
+  if (!isValidUrl(backendUrl)) {
+    alert("Please enter a valid backend URL.");
+    return;
+  }
 
-      try {
-        const response = await axios({
-          method: agentReply.method,
-          url: agentReply.url,
-          data: agentReply.body,
-          headers: agentReply.headers,
+  const firstTime = !counter.get(selectedApp);
+  const newCounter = new Map(counter);
+  newCounter.set(selectedApp, 1);
+  setCounterAppJson(newCounter);
+
+  const payload = {
+    message: input,
+    sessionId: selectedApp,
+    application: selectedApp,
+    ...(firstTime && appJson ? { status: appJson.status, spec: appJson.spec } : {})
+  };
+
+  fetch(backendUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+    .then(res => res.json())
+    .then(data => {
+      setMessages(prev => [...prev, { user: "Agent", text: data.reply || JSON.stringify(data) }]);
+
+      if (data.method && data.url && data.method !== "None" && data.url !== "None") {
+        setApiRequest({
+          method: data.method,
+          url: data.url,
+          body: data.body !== "None" ? data.body : null
         });
-        setApiResponse(response.data);
-        setError('');
-      } catch (err) {
-        setError('Failed to execute API call');
-        setApiResponse({ error: 'API call failed' });
+      } else {
+        setApiRequest(null);
       }
-    };
+    })
+    .catch(err => {
+      console.error("Chat backend error:", err);
+      setMessages(prev => [...prev, { user: "Agent", text: "Error getting chat response." }]);
+    });
+};
 
-    const sendApiResponseToBackend = async () => {
-      if (!backendUrl || !apiResponse) {
-        setError('No API response to send or backend URL missing');
-        return;
-      }
+const runSuggestedRequest = () => {
+  if (!apiRequest || !apiRequest.method || !apiRequest.url) {
+    alert("No valid API request to run.");
+    return;
+  }
 
-      try {
-        const response = await axios.post(backendUrl, { apiResponse });
-        setChatHistory([...chatHistory, `API Response sent to AI: ${JSON.stringify(response.data.comment)}`]);
-        setError('');
-      } catch (err) {
-        setError('Failed to send API response to backend');
-      }
-    };
+  const fullUrl = apiRequest.url.startsWith("http")
+    ? apiRequest.url
+    : `${window.location.origin}${apiRequest.url}`;
 
-    return React.createElement(
-      'div',
-      { style: { padding: '16px', backgroundColor: '#f3f4f6', height: '100%', display: 'flex', flexDirection: 'column' } },
-      React.createElement('h2', { style: { fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' } }, 'AI Extension'),
-      React.createElement('input', {
-        type: 'text',
-        placeholder: 'Enter Backend URL',
-        value: backendUrl,
-        onChange: (e) => setBackendUrl(e.target.value),
-        style: { marginBottom: '16px', width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' },
-      }),
-      React.createElement(
-        'select',
-        {
-          value: selectedApp,
-          onChange: (e) => setSelectedApp(e.target.value),
-          style: { marginBottom: '16px', width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' },
-        },
-        React.createElement('option', { value: '' }, 'Select an application'),
-        applications.map((app) =>
-          React.createElement('option', { key: app.metadata.name, value: app.metadata.name }, app.metadata.name)
-        )
-      ),
-      React.createElement('textarea', {
-        value: chatInput,
-        onChange: (e) => setChatInput(e.target.value),
-        placeholder: 'Type your message...',
-        style: { marginBottom: '16px', width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', height: '96px' },
-      }),
-      React.createElement(
-        'button',
-        {
-          onClick: sendMessage,
-          style: { marginBottom: '16px', backgroundColor: '#3b82f6', color: 'white', padding: '8px', borderRadius: '4px' },
-        },
-        'Send'
-      ),
-      error && React.createElement('div', { style: { color: '#ef4444', marginBottom: '16px' } }, error),
-      React.createElement(
-        'div',
-        { style: { flex: 1, overflowY: 'auto', backgroundColor: 'white', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', marginBottom: '16px' } },
-        chatHistory.map((message, index) =>
-          React.createElement('div', { key: index, style: { marginBottom: '8px' } }, message)
-        )
-      ),
-      agentReply?.shouldRun &&
-        React.createElement(
-          'button',
-          {
-            onClick: runApi,
-            style: { marginBottom: '16px', backgroundColor: '#10b981', color: 'white', padding: '8px', borderRadius: '4px' },
-          },
-          'Run API'
-        ),
-      apiResponse &&
-        React.createElement(
-          'div',
-          { style: { backgroundColor: '#e5e7eb', padding: '16px', borderRadius: '4px', marginBottom: '16px' } },
-          React.createElement('h3', { style: { fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' } }, 'API Response'),
-          React.createElement('pre', { style: { fontSize: '12px', overflowX: 'auto' } }, JSON.stringify(apiResponse, null, 2)),
-          React.createElement(
-            'button',
-            {
-              onClick: sendApiResponseToBackend,
-              style: { marginTop: '8px', backgroundColor: '#8b5cf6', color: 'white', padding: '8px', borderRadius: '4px' },
-            },
-            'Send to AI'
+  fetch(fullUrl, {
+    method: apiRequest.method,
+    headers: { "Content-Type": "application/json" },
+    body: apiRequest.body ? JSON.stringify(apiRequest.body) : null
+  })
+    .then(res => res.json())
+    .then(data => {
+      setMessages(prev => [
+        ...prev,
+        { user: "Agent", text: `✅ Executed ${apiRequest.method} ${apiRequest.url}` },
+        { user: "Agent", text: JSON.stringify(data, null, 2) }
+      ]);
+    })
+    .catch(err => {
+      console.error("API request failed:", err);
+      setMessages(prev => [
+        ...prev,
+        { user: "Agent", text: `❌ Failed to execute ${apiRequest.method} ${apiRequest.url}` }
+      ]);
+    });
+};
+
+return React.createElement("div", { style: { padding: "20px", fontFamily: "sans-serif" } },
+  React.createElement("h2", null, "Argo CD Chat Assistant"),
+  React.createElement("div", { style: { marginBottom: "10px" } },
+    React.createElement("label", { htmlFor: "backendUrl", style: { marginRight: "10px" } }, "Backend URL:"),
+    React.createElement("input", {
+      type: "text",
+      id: "backendUrl",
+      value: backendUrl,
+      onChange: e => setBackendUrl(e.target.value),
+      placeholder: "https://your-backend/api/analyze",
+      style: { width: "60%" }
+    })
+  ),
+  React.createElement("div", { style: { marginBottom: "15px" } },
+    React.createElement("label", { htmlFor: "appSelect", style: { marginRight: "10px" } }, "Select Application:"),
+    React.createElement("select", {
+      id: "appSelect",
+      value: selectedApp,
+      onChange: handleAppChange,
+      style: { padding: "5px" }
+    },
+      React.createElement("option", { value: "" }, "-- Choose --"),
+      apps.map(app => React.createElement("option", { key: app, value: app }, app))
+    )
+  ),
+  loading &&
+    React.createElement("p", { style: { color: "orange" } }, "Loading application info..."),
+  selectedApp &&
+    React.createElement("div", null,
+      React.createElement("div", {
+        style: {
+          border: "1px solid #ccc",
+          height: "300px",
+          overflowY: "auto",
+          padding: "10px",
+          marginBottom: "10px",
+          backgroundColor: "#f9f9f9"
+        }
+      },
+        messages.map((msg, idx) =>
+          React.createElement("div", { key: idx, style: { marginBottom: "8px" } },
+            React.createElement("strong", null, `${msg.user}: `),
+            msg.text
           )
         )
-    );
-  };
+      ),
+      React.createElement("input", {
+        type: "text",
+        value: input,
+        onChange: e => setInput(e.target.value),
+        onKeyDown: e => e.key === "Enter" && handleSend(),
+        placeholder: "Type your message...",
+        style: { width: "80%", marginRight: "5px" }
+      }),
+      React.createElement("button", { onClick: handleSend }, "Send"),
+      apiRequest &&
+        React.createElement("div", { style: { marginTop: "10px" } },
+          React.createElement("p", null, `Suggested: ${apiRequest.method} ${apiRequest.url}`),
+          React.createElement("button", { onClick: runSuggestedRequest }, "Send Request")
+        )
+    ),
+  !selectedApp &&
+    React.createElement("p", { style: { color: "gray" } }, "Select an app to start chatting.")
+);
+};
 
-  // Load dependencies and register extension
-  const loadDependencies = () => {
-    const scripts = [
-      'https://unpkg.com/react@17/umd/react.production.min.js',
-      'https://unpkg.com/react-dom@17/umd/react-dom.production.min.js',
-      'https://unpkg.com/axios@1.6.0/dist/axios.min.js',
-      'https://unpkg.com/@argoproj/argo-ui@1.0.0/dist/argo.min.js',
-    ];
-
-    scripts.forEach((src) => {
-      const script = document.createElement('script');
-      script.src = src;
-      script.async = false;
-      document.head.appendChild(script);
-    });
-  };
-
-  loadDependencies();
-  window.extensionsAPI.registerSystemLevelExtension(
-    ArgoCDAIExtension,
-    'AI Extension',
-    '/ai-extension',
-    'fa-robot'
-  );
-})(window);
+window.extensionsAPI.registerSystemLevelExtension(
+ChatExtension,
+"Chat",
+"/chat",
+"fa-comments"
+);
+})();
